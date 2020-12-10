@@ -1,11 +1,11 @@
 import json
 import shutil
 from pathlib import Path
-from typing import List, Type, Dict
+from typing import List, Dict
 import spikeextractors as se
 from spikecomparison.studytools import load_probe_file_inplace
-from spikesorters import sorter_dict, run_sorter
-from spikeextractors import MEArecRecordingExtractor, NpzSortingExtractor, MEArecSortingExtractor
+from spikesorters import run_sorter
+from spikeextractors import MEArecRecordingExtractor, NpzSortingExtractor, MEArecSortingExtractor, SortingExtractor
 
 
 class SpikeSorter:
@@ -16,17 +16,17 @@ class SpikeSorter:
         self.sorter_names = sorter_names
         self.cache_path = dataset_path.parent / '.cache'
         self.recording_cache = self.cache_path / 'recording'
-        self.ground_truth_cache = self.cache_path / 'ground_truth.dat'
+        self.ground_truth_cache = self.cache_path / 'ground_truth.npz'
         self.sorting_cache = self.cache_path / 'sortings'
+        self.metrics_cache = self.cache_path / 'metrics.feather'
         self.raw_data_path = self.recording_cache / 'raw.dat'
         self.prb_path = self.recording_cache / 'probes.prb'
         self.info_path = self.recording_cache / 'info.json'
 
-        self.recording_extractor = self._build_recording_extractor()
-        self.ground_truth_extractor = self._build_ground_truth()
-        self.sorting_extractors = self._build_sorting_extractors()
+        self.recording = self.get_recording()
+        self.ground_truth = self.get_ground_truth()
 
-    def _build_recording_extractor(self) -> MEArecRecordingExtractor:
+    def get_recording(self) -> MEArecRecordingExtractor:
         try:
             self.recording_cache.mkdir(parents=True, exist_ok=False)
         except FileExistsError:
@@ -37,47 +37,57 @@ class SpikeSorter:
                 # If the recording cache exists but cant be read,
                 # the whole cache including the sorting results are invalidated.
                 shutil.rmtree(self.cache_path)
-                return self._build_recording_extractor()
+                return self.get_recording()
         else:
             recording_extractor = MEArecRecordingExtractor(self.dataset_path)
             self._cache_recording(recording_extractor)
 
         return recording_extractor
 
-    def _build_ground_truth(self) -> MEArecSortingExtractor:
-        return MEArecSortingExtractor(self.dataset_path)
-
-    def _build_sorting_extractors(self) -> Dict[str, NpzSortingExtractor]:
-        return {sorter_name: self._build_sorting_extractor(sorter_name) for sorter_name in self.sorter_names}
-
-    def _build_sorting_extractor(self, sorter_name):
-        s_cache = self.sorting_cache / sorter_name
-        try:
-            s_cache.mkdir(parents=True, exist_ok=False)
-        except FileExistsError:
-            sorter_class = sorter_dict[sorter_name]
+    def get_ground_truth(self) -> NpzSortingExtractor:
+        if self.ground_truth_cache.exists():
             try:
-                return sorter_class.get_result_from_folder(s_cache)
+                return NpzSortingExtractor(self.ground_truth_cache)
+            except :
+                print(f"Error reading ground truth cache, deleting...")
+                self.ground_truth_cache.unlink()
+                return self.get_ground_truth()
+        else:
+            ground_truth = MEArecSortingExtractor(self.dataset_path)
+            NpzSortingExtractor.write_sorting(ground_truth, save_path=str(self.ground_truth_cache))
+            return NpzSortingExtractor(self.ground_truth_cache)
+
+    def get_sortings(self) -> Dict[str, NpzSortingExtractor]:
+        return {sorter_name: self.get_sorting(sorter_name) for sorter_name in self.sorter_names}
+
+    def get_sorting(self, sorter_name) -> NpzSortingExtractor:
+        s_cache = self.sorting_cache / f'{sorter_name}.npz'
+        if s_cache.exists():
+            try:
+                return NpzSortingExtractor(s_cache)
             except:
                 print(f"Error reading {sorter_name} cache, deleting...")
                 shutil.rmtree(s_cache)
-                return self._build_sorting_extractor(sorter_name)
+                return self.get_sorting(sorter_name)
+
         else:
             print(f"Running {sorter_name}...")
-            return run_sorter(
+            sorting: SortingExtractor = run_sorter(
                 sorter_name,
-                recording=self.recording_extractor,
-                output_folder=s_cache
+                recording=self.recording,
+                output_folder=s_cache,
+                delete_output_folder=True
             )
 
-    def get_recording(self):
-        return self.recording_extractor
+            NpzSortingExtractor.write_sorting(sorting, save_path=str(s_cache))
+            return NpzSortingExtractor(s_cache)
 
-    def get_ground_truth(self):
-        return self.ground_truth_extractor
-
-    def get_sorting(self, sorter_name: str) -> NpzSortingExtractor:
-            return self.sorting_extractors[sorter_name]
+    # def get_sorter_metrics(self, sorter_name: str, metrics_names: List[str]):
+    #     m_cache = self.sorting_cache / sorter_name / 'metrics'
+    #     try:
+    #         m_cache.mkdir(parents=True, exist_ok=False)
+    #     except FileExistsError:
+    #         sorter_class = sorter_dict[sorter_name]
 
     def _cache_recording(self, recording_extractor):
         """ If the recording exists in the cache, just return it.
@@ -108,13 +118,3 @@ class SpikeSorter:
                                           info['dtype'], time_axis=info['time_axis'])
         load_probe_file_inplace(rec, str(self.prb_path))
         return rec
-
-
-def example():
-    dataset_path = Path("/home/mclancy/SpikeConfidence/analyses/recordings_50cells_SqMEA/recordings_50cells_SqMEA-10-15um_60.0_10.0uV_27-03-2019_13-31-005.h5")
-    session = SpikeSorter(dataset_path, sorter_names=['herdingspikes'])
-    recording = session.get_recording()
-    sorting = session.get_sorting(sorter_name='herdingspikes')
-    print(sorting)
-    print(recording)
-example()
