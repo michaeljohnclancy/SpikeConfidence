@@ -7,10 +7,12 @@ import pandas as pd
 from sorter import SpikeSorter
 
 
-def prepare_hungarian_agreement_dataset(dataset_path: Path, sorter_names: List[str],
-                    metric_names: List[str], shuffle: bool = True,
-                    drop_nans: bool = True):
-
+def prepare_hungarian_agreement_dataset(
+        dataset_path: Path,
+        sorter_names: List[str],
+        metric_names: List[str],
+        drop_nans: bool = True
+):
     session = SpikeSorter(dataset_path)
 
     X = np.empty(shape=(0, len(metric_names)))
@@ -29,11 +31,5 @@ def prepare_hungarian_agreement_dataset(dataset_path: Path, sorter_names: List[s
         nan_index = ~np.isnan(X).any(axis=1)
         X = X[nan_index]
         y = y[nan_index]
-
-    if shuffle:
-        index = np.arange(X.shape[0])
-        np.random.shuffle(index)
-        X = X[index].squeeze()
-        y = y[index].squeeze()
 
     return X, y

@@ -63,6 +63,10 @@ class SpikeSorter:
 
     def get_sorting(self, sorter_name) -> NpzSortingExtractor:
         s_cache = self.sorting_cache / sorter_name
+        try:
+            shutil.rmtree(s_cache)
+        except FileNotFoundError:
+            pass
         s_npz_cache = s_cache.with_suffix('.npz')
         if s_npz_cache.exists():
             try:
@@ -85,7 +89,7 @@ class SpikeSorter:
 
             shutil.rmtree(s_cache)
 
-            return NpzSortingExtractor(s_cache)
+            return NpzSortingExtractor(s_npz_cache)
 
     def get_sorter_metrics(self, sorter_name: str, metric_names: List[str]):
         self.metrics_cache.mkdir(exist_ok=True)
