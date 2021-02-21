@@ -3,7 +3,6 @@ from typing import List, Tuple, Optional
 
 import numpy as np
 import pandas as pd
-from spikeextractors import RecordingExtractor, SortingExtractor
 
 from spikeforest2_utils import AutoRecordingExtractor, AutoSortingExtractor
 
@@ -61,11 +60,11 @@ def prepare_dataset_from_hash(
         sorter_names: List[str],
         metric_names: List[str],
         cache_path: Path,
-        recording_extractor=AutoRecordingExtractor,
-        gt_extractor=AutoSortingExtractor,
 ):
-    recording = recording_extractor(recording_path, download=True)
-    gt_sorting = gt_extractor(gt_path)
+    cache_path = cache_path / recording_path.split('//')[1]
 
-    session = SpikeSession(recording, gt_sorting, cache_path=cache_path / recording_path.split('//')[1])
+    recording = AutoRecordingExtractor(recording_path, download=True)
+    gt_sorting = AutoSortingExtractor(gt_path)
+
+    session = SpikeSession(recording, gt_sorting, cache_path=cache_path)
     return prepare_fp_dataset(session, sorter_names=sorter_names, metric_names=metric_names)

@@ -164,6 +164,8 @@ class SpikeSession:
             cache_path: Path
     ):
 
+        cache_path.mkdir(parents=True, exist_ok=True)
+
         self.sorting_cache = cache_path / 'sortings'
         self.metrics_cache = cache_path / 'metrics'
 
