@@ -59,7 +59,7 @@ metric_names = np.array(["num_spikes", "firing_rate", "presence_ratio",
                          "isi_violation", "amplitude_cutoff", "snr",
                          "max_drift", "cumulative_drift", "silhouette_score",
                          "isolation_distance", "l_ratio",
-                         "nn_hit_rate", "nn_miss_rate","d_prime"])
+                         "nn_hit_rate", "nn_miss_rate", "d_prime"])
 
 # False positive classification dataset prepared
 X, y = prepare_dataset_from_hash(recording_path=drift_recording_path, gt_path=drift_gt_path, metric_names=metric_names, sorter_names=sorter_names, cache_path=cache_path)
@@ -71,24 +71,28 @@ model.fit(X_train, y_train)
 ranked_metrics_index = sorted(range(len(metric_names)), key=lambda k: abs(model.named_steps.logisticregression.coef_[0][k]), reverse=True)
 
 # Plotting the regression accuracies for the k most important features, for k from 1 to num_metrics,
-accuracies = []
-for i in range(1, len(ranked_metrics_index)+1):
-    m_names = metric_names[ranked_metrics_index[:i]]
-    print(f"Features are {m_names}")
+try:
+    accuracies = np.load('results/featureselection.npy')
+except FileNotFoundError:
+    accuracies = np.empty(len(metric_names))
+    for i in range(1, len(ranked_metrics_index)+1):
+        m_names = metric_names[ranked_metrics_index[:i]]
+        print(f"Features are {m_names}")
 
-    X, y = prepare_dataset_from_hash(recording_path=drift_recording_path, gt_path=drift_gt_path,
-                                     metric_names=m_names, sorter_names=sorter_names, cache_path=cache_path)
+        X, y = prepare_dataset_from_hash(recording_path=drift_recording_path, gt_path=drift_gt_path,
+                                         metric_names=m_names, sorter_names=sorter_names, cache_path=cache_path)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=0)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=0)
 
-    # False positive classification via logistic regression
-    model = make_pipeline(StandardScaler(), LogisticRegression())
-    model.fit(X_train, y_train)
-    acc = model.score(X_test, y_test)
-    accuracies.append(acc)
-    # model_f1_score = f1_score(y_test, y_preds, average='binary')
-    print(f"Acc Score is {acc}")
+        # False positive classification via logistic regression
+        model = make_pipeline(StandardScaler(), LogisticRegression())
+        model.fit(X_train, y_train)
+        acc = model.score(X_test, y_test)
+        accuracies[i-1] = acc
+        # model_f1_score = f1_score(y_test, y_preds, average='binary')
+        print(f"Acc Score is {acc}")
 
+    np.save('results/featureselection.npy', accuracies)
 
 plt.clf()
 plt.plot(range(len(metric_names)), accuracies)
