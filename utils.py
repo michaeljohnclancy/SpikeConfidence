@@ -6,7 +6,7 @@ import pandas as pd
 
 from spikeforest2_utils import AutoRecordingExtractor, AutoSortingExtractor
 
-from sorter import SpikeSorter, SpikeSession
+from sorter import SpikeSession
 
 
 def prepare_fp_dataset(session: SpikeSession, sorter_names: List[str], metric_names: List[str], drop_nans: Optional[bool] = False):
@@ -29,7 +29,7 @@ def prepare_fp_dataset(session: SpikeSession, sorter_names: List[str], metric_na
 
     return X, y
 
-def _prepare_agreement_score_data(session: SpikeSorter, sorter_names: List[str], hungarian: bool = True):
+def _prepare_agreement_score_data(session: SpikeSession, sorter_names: List[str], hungarian: bool = True):
     #UNUSED
     y = np.array([])
     for sorter_name in sorter_names:
@@ -52,7 +52,6 @@ def _prepare_agreement_score_data(session: SpikeSorter, sorter_names: List[str],
 #
 #         data = [prepare_fp_dataset(session, sorter_names, metric_names) for dataset_path in dataset_paths]
 #         return np.vstack([d[0] for d in data]), np.hstack([d[1] for d in data])
-
 
 def prepare_dataset_from_hash(
         recording_path: str,
