@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -53,17 +53,40 @@ def _prepare_agreement_score_data(session: SpikeSession, sorter_names: List[str]
 #         data = [prepare_fp_dataset(session, sorter_names, metric_names) for dataset_path in dataset_paths]
 #         return np.vstack([d[0] for d in data]), np.hstack([d[1] for d in data])
 
+
 def prepare_dataset_from_hash(
-        recording_path: str,
-        gt_path: str,
+        recording_paths: Union[str, List[str]],
+        gt_paths: Union[str, List[str]],
         sorter_names: List[str],
         metric_names: List[str],
         cache_path: Path,
 ):
-    cache_path = cache_path / recording_path.split('//')[1]
+    if isinstance(recording_paths, str):
+        recording_paths = [recording_paths]
 
-    recording = AutoRecordingExtractor(recording_path, download=True)
-    gt_sorting = AutoSortingExtractor(gt_path)
+    if isinstance(gt_paths, str):
+        gt_paths = [gt_paths]
 
-    session = SpikeSession(recording, gt_sorting, cache_path=cache_path)
-    return prepare_fp_dataset(session, sorter_names=sorter_names, metric_names=metric_names)
+    if len(recording_paths) != len(gt_paths):
+        raise ValueError(f"You have provided {len(recording_paths)} recording hashes and {len(gt_paths)} ground truth hashes! These must be the same.")
+
+    all_X = []
+    all_y = []
+    for i in range(len(recording_paths)):
+        recording_path = recording_paths[i]
+        gt_path = gt_paths[i]
+
+        c_path = cache_path / recording_path.split('//')[1]
+
+        recording = AutoRecordingExtractor(recording_path, download=True)
+        gt_sorting = AutoSortingExtractor(gt_path)
+
+        session = SpikeSession(recording, gt_sorting, cache_path=c_path)
+
+        X, y = prepare_fp_dataset(session, sorter_names=sorter_names, metric_names=metric_names)
+
+        all_X.append(X)
+        all_y.append(y)
+
+
+    return np.vstack(all_X), np.hstack(all_y)
