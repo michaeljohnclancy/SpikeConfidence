@@ -1,5 +1,4 @@
 import pandas as pd
-import json
 import shutil
 from pathlib import Path
 from typing import List, Dict
@@ -29,7 +28,7 @@ class SpikeSession:
     def get_sortings(self, sorter_names: List[str]) -> Dict[str, NpzSortingExtractor]:
         return {sorter_name: self.get_sorting(sorter_name) for sorter_name in sorter_names}
 
-    def get_sorting(self, sorter_name) -> NpzSortingExtractor:
+    def get_sorting(self, sorter_name: str) -> NpzSortingExtractor:
         s_cache = self.sorting_cache / sorter_name
         try:
             shutil.rmtree(s_cache)
@@ -42,6 +41,7 @@ class SpikeSession:
             except:
                 print(f"Error reading {sorter_name} cache, deleting...")
                 s_npz_cache.unlink()
+                # If there is bad file permissions which means the file cant be used/deleted, this will infinite loop.
                 return self.get_sorting(sorter_name)
 
         else:
